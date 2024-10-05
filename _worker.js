@@ -1392,54 +1392,138 @@ async function getVLESSConfig(userID, hostName, sub, UA, RproxyIP, _url) {
 		}
 
 		return `
-################################################################
-Subscribe / sub 订阅地址, 支持 Base64、clash-meta、sing-box 订阅格式
----------------------------------------------------------------
-快速自适应订阅地址:
-https://${proxyhost}${hostName}/${userID}
-https://${proxyhost}${hostName}/${userID}?sub
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscription Links</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h2 {
+            color: #333;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        pre {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            position: relative;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            position: absolute;
+            right: 10px;
+            top: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+        }
+        .footer a {
+            text-decoration: none;
+            color: #007bff;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Subscription Links</h2>
 
-Base64订阅地址:
-https://${proxyhost}${hostName}/${userID}?b64
-https://${proxyhost}${hostName}/${userID}?base64
+        <div class="section">
+            <h3>Quick Adaptive Subscription</h3>
+            <pre id="adaptive-url">https://${proxyhost}${hostName}/${userID}
+https://${proxyhost}${hostName}/${userID}?sub</pre>
+            <button onclick="copyToClipboard('adaptive-url')">Copy</button>
+        </div>
 
-clash订阅地址:
-https://${proxyhost}${hostName}/${userID}?clash
+        <div class="section">
+            <h3>Base64 Subscription</h3>
+            <pre id="base64-url">https://${proxyhost}${hostName}/${userID}?b64
+https://${proxyhost}${hostName}/${userID}?base64</pre>
+            <button onclick="copyToClipboard('base64-url')">Copy</button>
+        </div>
 
-singbox订阅地址:
-https://${proxyhost}${hostName}/${userID}?sb
-https://${proxyhost}${hostName}/${userID}?singbox
----------------------------------------------------------------
-################################################################
-${FileName} 配置信息
----------------------------------------------------------------
-HOST: ${hostName}
+        <div class="section">
+            <h3>Clash Subscription</h3>
+            <pre id="clash-url">https://${proxyhost}${hostName}/${userID}?clash</pre>
+            <button onclick="copyToClipboard('clash-url')">Copy</button>
+        </div>
+
+        <div class="section">
+            <h3>Singbox Subscription</h3>
+            <pre id="singbox-url">https://${proxyhost}${hostName}/${userID}?sb
+https://${proxyhost}${hostName}/${userID}?singbox</pre>
+            <button onclick="copyToClipboard('singbox-url')">Copy</button>
+        </div>
+
+        <div class="section">
+            <h3>Config Info</h3>
+            <pre id="config-info">HOST: ${hostName}
 UUID: ${userID}
 FKID: ${fakeUserID}
-UA: ${UA}
+UA: ${UA}</pre>
+            <button onclick="copyToClipboard('config-info')">Copy</button>
+        </div>
 
-${订阅器}
-SUBAPI（订阅转换后端）: ${subProtocol}://${subconverter}
-SUBCONFIG（订阅转换配置文件）: ${subconfig}
----------------------------------------------------------------
-################################################################
-v2ray
----------------------------------------------------------------
-${v2ray}
----------------------------------------------------------------
-################################################################
-clash-meta
----------------------------------------------------------------
-${clash}
----------------------------------------------------------------
-################################################################
-telegram 交流群 技术大佬~在线发牌!
-https://t.me/CMLiussss
----------------------------------------------------------------
-github 项目地址 Star!Star!Star!!!
-https://github.com/cmliu/edgetunnel
----------------------------------------------------------------
-################################################################
+        <div class="section">
+            <h3>v2ray Configuration</h3>
+            <pre id="v2ray-config">${v2ray}</pre>
+            <button onclick="copyToClipboard('v2ray-config')">Copy</button>
+        </div>
+
+        <div class="section">
+            <h3>Clash-meta Configuration</h3>
+            <pre id="clash-meta-config">${clash}</pre>
+            <button onclick="copyToClipboard('clash-meta-config')">Copy</button>
+        </div>
+
+        <div class="footer">
+            <p>Join the Telegram Group: <a href="https://t.me/CMLiussss">Technical Experts!</a></p>
+            <p>GitHub Project: <a href="https://github.com/cmliu/edgetunnel">Star! Star! Star!!!</a></p>
+        </div>
+    </div>
+
+    <script>
+        function copyToClipboard(id) {
+            var text = document.getElementById(id).textContent;
+            navigator.clipboard.writeText(text).then(function() {
+                alert('Copied to clipboard');
+            }, function(err) {
+                alert('Failed to copy');
+            });
+        }
+    </script>
+</body>
+</html>
+
 `;
 	} else {
 		if (typeof fetch != 'function') {
