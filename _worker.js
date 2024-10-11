@@ -77,6 +77,8 @@ let proxyhosts = [];//本地代理域名池
 let proxyhostsURL = 'https://raw.githubusercontent.com/cmliu/CFcdnVmess2sub/main/proxyhosts';//在线代理域名池URL
 let RproxyIP = 'false';
 let httpsPorts = ["2053","2083","2087","2096","8443"];
+let effectiveTime = 1;//有效时间 单位:天
+let updateTime = 1;//更新时间
 export default {
 	/**
 	 * @param {import("@cloudflare/workers-types").Request} request
@@ -97,7 +99,9 @@ export default {
 			fakeUserID = fakeUserIDMD5.slice(0, 8) + "-" + fakeUserIDMD5.slice(8, 12) + "-" + fakeUserIDMD5.slice(12, 16) + "-" + fakeUserIDMD5.slice(16, 20) + "-" + fakeUserIDMD5.slice(20);
 			fakeHostName = fakeUserIDMD5.slice(6, 9) + "." + fakeUserIDMD5.slice(13, 19);
 			//console.log(`虚假UUID: ${fakeUserID}`); // 打印fakeID
-
+			if (env.KEY) userID = await generateDynamicUUID(env.KEY);
+			effectiveTime = env.TIME || effectiveTime;
+			updateTime = env.UPTIME || updateTime;
 			proxyIP = env.PROXYIP || proxyIP;
 			proxyIPs = await ADD(proxyIP);
 			proxyIP = proxyIPs[Math.floor(Math.random() * proxyIPs.length)];
@@ -146,9 +150,8 @@ export default {
 			FileName = env.SUBNAME || FileName;
 			if (url.searchParams.has('notls')) noTLS = 'true';
 			if (!upgradeHeader || upgradeHeader !== 'websocket') {
-				// const url = new URL(request.url);
-				switch (url.pathname.toLowerCase()) {
-				case '/':
+				const 路径 = url.pathname.toLowerCase();
+				if (路径 == '/') {
 					if (env.URL302) return Response.redirect(env.URL302, 302);
 					else if (env.URL) return await proxyURL(env.URL, url);
 					else return new Response(JSON.stringify(request.cf, null, 4), {
@@ -157,12 +160,12 @@ export default {
 							'content-type': 'application/json',
 						},
 					});
-				case `/${fakeUserID}`:
-					const fakeConfig = await getVLESSConfig(userID, request.headers.get('Host'), sub, 'CF-Workers-SUB', RproxyIP, url);
+				} else if (路径 == `/${fakeUserID}`) {
+					const fakeConfig = await getVLESSConfig(userID, request.headers.get('Host'), sub, 'CF-Workers-SUB', RproxyIP, url, env);
 					return new Response(`${fakeConfig}`, { status: 200 });
-				case `/${userID}`: {
+				} else if (路径 == `/${env.KEY}` || 路径 == `/${userID}`) {
 					await sendMessage(`#获取订阅 ${FileName}`, request.headers.get('CF-Connecting-IP'), `UA: ${UA}</tg-spoiler>\n域名: ${url.hostname}\n<tg-spoiler>入口: ${url.pathname + url.search}</tg-spoiler>`);
-					const vlessConfig = await getVLESSConfig(userID, request.headers.get('Host'), sub, UA, RproxyIP, url);
+					const vlessConfig = await getVLESSConfig(userID, request.headers.get('Host'), sub, UA, RproxyIP, url, env);
 					const now = Date.now();
 					//const timestamp = Math.floor(now / 1000);
 					const today = new Date(now);
@@ -208,8 +211,7 @@ export default {
 							}
 						});
 					}
-				}
-				default:
+				} else {
 					if (env.URL302) return Response.redirect(env.URL302, 302);
 					else if (env.URL) return await proxyURL(env.URL, url);
 					else return new Response('不用怀疑！你UUID就是错的！！！', { status: 404 });
@@ -243,6 +245,7 @@ export default {
 				} else {
 					enableSocks = false;
 				}
+
 				return await vlessOverWSHandler(request);
 			}
 		} catch (err) {
@@ -1250,7 +1253,7 @@ async function proxyURL(proxyURL, url) {
 function checkSUB(host) {
 	if ((!sub || sub == '') && (addresses.length + addressesapi.length + addressesnotls.length + addressesnotlsapi.length + addressescsv.length) == 0){
 		addresses = [
-			'Join.my.Telegram.channel.CMLiussss.to.unlock.more.premium.nodes.cf.090227.xyz#加入我的频道t.me/CMLiussss解锁更多优选节点',
+			'',
 			'visa.cn:443',
 			'www.visa.com:8443',
 			'cis.visa.com:2053',
@@ -1329,7 +1332,8 @@ let subParams = ['sub','base64','b64','clash','singbox','sb'];
  * @param {string} UA
  * @returns {Promise<string>}
  */
-async function getVLESSConfig(userID, hostName, sub, UA, RproxyIP, _url) {
+async function getVLESSConfig(userID, hostName, sub, UA, RproxyIP, _url, env) {
+	const uuid = (_url.pathname == `/${env.KEY}`) ? env.KEY : userID;
 	checkSUB(hostName);
 	const userAgent = UA.toLowerCase();
 	const Config = 配置信息(userID , hostName);
@@ -1373,7 +1377,7 @@ async function getVLESSConfig(userID, hostName, sub, UA, RproxyIP, _url) {
 			else socks5List += `\n  ${go2Socks5s.join('\n  ')}\n`;
 		}
 
-		let 订阅器 = '';
+		let 订阅器 = '\n';
 		if (!sub || sub == '') {
 			if (enableSocks) 订阅器 += `CFCDN（访问方式）: Socks5\n  ${newSocks5s.join('\n  ')}\n${socks5List}`;
 			else if (proxyIP && proxyIP != '') 订阅器 += `CFCDN（访问方式）: ProxyIP\n  ${proxyIPs.join('\n  ')}\n`;
@@ -1392,36 +1396,36 @@ async function getVLESSConfig(userID, hostName, sub, UA, RproxyIP, _url) {
 			订阅器 += `\nSUB（优选订阅生成器）: ${sub}`;
 		}
 
+		if (env.KEY && _url.pathname !== `/${env.KEY}`) 订阅器 = '';
+		else 订阅器 += `\nSUBAPI（订阅转换后端）: ${subProtocol}://${subconverter}\nSUBCONFIG（订阅转换配置文件）: ${subconfig}`;
+		const 动态UUID = (uuid != userID) ? `TOKEN: ${uuid}\nTIME（动态UUID有效时间）: ${effectiveTime} 天\nUPTIME（动态UUID更新时间）: ${updateTime} 时（北京时间）\n\n` : "";
 		return `
 ################################################################
 Subscribe / sub 订阅地址, 支持 Base64、clash-meta、sing-box 订阅格式
 ---------------------------------------------------------------
 快速自适应订阅地址:
-https://${proxyhost}${hostName}/${userID}
-https://${proxyhost}${hostName}/${userID}?sub
+https://${proxyhost}${hostName}/${uuid}
+https://${proxyhost}${hostName}/${uuid}?sub
 
 Base64订阅地址:
-https://${proxyhost}${hostName}/${userID}?b64
-https://${proxyhost}${hostName}/${userID}?base64
+https://${proxyhost}${hostName}/${uuid}?b64
+https://${proxyhost}${hostName}/${uuid}?base64
 
 clash订阅地址:
-https://${proxyhost}${hostName}/${userID}?clash
+https://${proxyhost}${hostName}/${uuid}?clash
 
 singbox订阅地址:
-https://${proxyhost}${hostName}/${userID}?sb
-https://${proxyhost}${hostName}/${userID}?singbox
+https://${proxyhost}${hostName}/${uuid}?sb
+https://${proxyhost}${hostName}/${uuid}?singbox
 ---------------------------------------------------------------
 ################################################################
 ${FileName} 配置信息
 ---------------------------------------------------------------
-HOST: ${hostName}
+${动态UUID}HOST: ${hostName}
 UUID: ${userID}
 FKID: ${fakeUserID}
 UA: ${UA}
-
 ${订阅器}
-SUBAPI（订阅转换后端）: ${subProtocol}://${subconverter}
-SUBCONFIG（订阅转换配置文件）: ${subconfig}
 ---------------------------------------------------------------
 ################################################################
 v2ray
@@ -1711,7 +1715,7 @@ async function getAddressescsv(tls) {
 			
 			const ipAddressIndex = 0;// IP地址在 CSV 头部的位置
 			const portIndex = 1;// 端口在 CSV 头部的位置
-			const dataCenterIndex = tlsIndex + 1; // 数据中心是 TLS 的后一个字段
+			const dataCenterIndex = tlsIndex + 3; // 数据中心是 TLS 的后一个字段
 		
 			if (tlsIndex === -1) {
 				console.error('CSV文件缺少必需的字段');
@@ -1786,38 +1790,6 @@ function subAddresses(host,UUID,noTLS,newAddressesapi,newAddressescsv,newAddress
 				addressid = match[3] || address;
 			}
 
-					//🇸🇬 SG：新加坡 🇭🇰 HK：香港 🇰🇷 KR：韩国 🇯🇵 JP：日本 🇬🇧 GB：英国 🇺🇸 US：美国 🇼🇸 TW：台湾
-		if (addressid.includes('CM')) {
-			addressid = addressid;
-		} else if (addressid === 'SG'||addressid === 'SIN') {
-			addressid = '🇸🇬 SG';
-		} else if (addressid === 'HK'||addressid === 'HKG') {
-			addressid = '🇭🇰 HK';
-		} else if (addressid === 'KR'||addressid === 'ICN') {
-			addressid = '🇰🇷 KR';
-		} else if (addressid === 'JP'||addressid === 'NRT') {
-			addressid = '🇯🇵 JP';
-		} else if (addressid === 'FR'||addressid === 'CDG'||addressid === 'FRA') {
-			addressid = '🇫🇷 FR';
-		} else if (addressid === 'GB'||addressid === 'LHR') {
-			addressid = '🇬🇧 GB';
-		} else if (addressid === 'NL'||addressid === 'AMS') {
-			addressid = '🇳🇱 NL';
-		} else if (addressid === 'IN'||addressid === 'BOM') {
-			addressid = '🇮🇳 IN';
-		} else if (addressid === 'US'||addressid === 'LAX'||addressid === 'SEA'||addressid === 'SJC'||addressid === 'DFW'||addressid === 'ORD'||addressid === 'EWR'||addressid === 'IAD') {
-			addressid = '🇺🇸 US';
-		} else if (addressid === 'TW'||addressid === '') {
-			addressid = '🇼🇸 TW';
-		} else if (addressid === 'CF'||addressid === 'SIN') {
-			addressid = '📶 ' + addressid;
-		} else {
-			addressid = '📶 ' + addressid;
-		}
-	
-
-
-			
 			const httpPorts = ["8080","8880","2052","2082","2086","2095"];
 			if (!isValidIPv4(address) && port == "-1") {
 				for (let httpPort of httpPorts) {
@@ -1935,4 +1907,47 @@ async function sendMessage(type, ip, add_data = "") {
 function isValidIPv4(address) {
 	const ipv4Regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
 	return ipv4Regex.test(address);
+}
+
+function generateDynamicUUID(key) {
+	// 获取当前时间是当年的第几周（以北京时间凌晨3点为界）
+	function getWeekOfYear() {
+		const now = new Date();
+		
+		// 调整时间，将UTC时间转换为北京时间（加8小时）
+		const timezoneOffset = 8; // 北京时间相对于UTC的时区偏移+8小时
+		const adjustedNow = new Date(now.getTime() + timezoneOffset * 60 * 60 * 1000);
+
+		// 获取今年的第一天，并调整为北京时间凌晨3点
+		const start = new Date(adjustedNow.getFullYear(), 0, 1, updateTime, 0, 0); // 北京时间1月1日的凌晨3点
+
+		// 计算当前时间与今年1月1日凌晨3点的差距
+		const diff = adjustedNow - start;
+
+		// 一周的毫秒数（7天）
+		const oneWeek = 1000 * 60 * 60 * 24 * effectiveTime;
+
+		// 返回当前是第几周，向上取整
+		return Math.ceil(diff / oneWeek);
+	}
+	
+	const passwdTime = getWeekOfYear(); // 获取当前周数并存储
+
+	// 使用秘钥和当前周数拼接作为哈希的基础字符串
+	const baseString = key + passwdTime;
+
+	// 将字符串转换为哈希值（可以用SHA-256等）
+	const hashBuffer = new TextEncoder().encode(baseString);
+
+	// 使用crypto.subtle API生成SHA-256哈希值
+	return crypto.subtle.digest('SHA-256', hashBuffer).then((hash) => {
+		// 将哈希值转换为一个合格的UUID4
+		const hashArray = Array.from(new Uint8Array(hash));
+		const hexHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+		// UUID4 格式要求特定的几位必须是4和8/b
+		let uuid = hexHash.substr(0, 8) + '-' + hexHash.substr(8, 4) + '-4' + hexHash.substr(13, 3) + '-' + (parseInt(hexHash.substr(16, 2), 16) & 0x3f | 0x80).toString(16) + hexHash.substr(18, 2) + '-' + hexHash.substr(20, 12);
+
+		return uuid;
+	});
 }
